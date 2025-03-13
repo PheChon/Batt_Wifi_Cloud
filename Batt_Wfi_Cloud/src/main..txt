@@ -1,323 +1,150 @@
 #include <Arduino.h>
 #include <esp_now.h>
 #include <WiFi.h>
-#include <PubSubClient.h>
 
-// WiFi Configuration
-const char* ssid = "ROYPOW_AP";
-const char* password = "hack123456789";
-
-// MQTT Configuration
-const char* mqtt_server = "202.44.12.37";  
-const int mqtt_port = 1883;
-const char* mqtt_user = "student";   
-const char* mqtt_password = "idealab2024"; 
-const char* mqtt_topic = "Test";
-
-// Timing Configuration
-const unsigned long publishInterval = 5000;
-const unsigned long statusInterval = 2000; // Check stored data every 2 seconds
-unsigned long lastPublishTime = 0;
-unsigned long lastStatusTime = 0;
-
-// Structure for received CAN message
+// Structure to hold CAN message data (must match sender's structure)
 typedef struct struct_message {
-  unsigned long canId;
-  uint8_t len;
-  uint8_t data[8];
+    unsigned long canId;
+    uint8_t len;
+    uint8_t data[8];
 } struct_message;
 
-// Storage for each CAN ID's data (7 messages)
-struct_message canData[7];  
-bool dataReceived[7] = {false};  
-const unsigned long canIds[7] = {
-  2281734144, 2281799680, 2281865216, 2281930752,
-  2214625280, 2415951872, 2214756352
-};
+struct_message canMessage;
 
-// WiFi and MQTT Client
-WiFiClient wifiClient;
-PubSubClient client(wifiClient);
-
-// MQTT Reconnect Function
-void reconnect() {
-  while (!client.connected()) {
-    Serial.print("Attempting MQTT connection...");
-    String clientId = "ESP32-Client-";
-    clientId += String(random(0xffff), HEX);
-    if (client.connect(clientId.c_str(), mqtt_user, mqtt_password)) {
-      Serial.println("connected");
-    } else {
-      Serial.print("failed, rc=");
-      Serial.print(client.state());
-      Serial.println(" - trying again in 5 seconds");
-      for (int i = 0; i < 5; i++) {
-        delay(1000);
-      }
-    }
-  }
-}
-
-// [publishSingleCanData function remains unchanged]
-void publishSingleCanData(struct_message msg) {
-  char mqttPayload[256];
-  String payload = "{";
-
-  if (msg.canId == 2281734144) {
-    for (int i = 0; i < msg.len; i += 2) {
-      uint16_t word = (msg.data[i] << 8) | ((i + 1 < msg.len) ? msg.data[i + 1] : 0);
-      float decimalValue = (float)word / 1000.0;
-      char dec[10];
-      sprintf(dec, "%.3f", decimalValue);
-      if (i == 0) payload += "\"V1\": " + String(dec);
-      else if (i == 2) payload += ", \"V2\": " + String(dec);
-      else if (i == 4) payload += ", \"V3\": " + String(dec);
-      else if (i == 6) payload += ", \"V4\": " + String(dec);
-    }
-  }
-  else if (msg.canId == 2281799680) {
-    for (int i = 0; i < msg.len; i += 2) {
-      uint16_t word = (msg.data[i] << 8) | ((i + 1 < msg.len) ? msg.data[i + 1] : 0);
-      float decimalValue = (float)word / 1000.0;
-      char dec[10];
-      sprintf(dec, "%.3f", decimalValue);
-      if (i == 0) payload += "\"V5\": " + String(dec);
-      else if (i == 2) payload += ", \"V6\": " + String(dec);
-      else if (i == 4) payload += ", \"V7\": " + String(dec);
-      else if (i == 6) payload += ", \"V8\": " + String(dec);
-    }
-  }
-  else if (msg.canId == 2281865216) {
-    for (int i = 0; i < msg.len; i += 2) {
-      uint16_t word = (msg.data[i] << 8) | ((i + 1 < msg.len) ? msg.data[i + 1] : 0);
-      float decimalValue = (float)word / 1000.0;
-      char dec[10];
-      sprintf(dec, "%.3f", decimalValue);
-      if (i == 0) payload += "\"V9\": " + String(dec);
-      else if (i == 2) payload += ", \"V10\": " + String(dec);
-      else if (i == 4) payload += ", \"V11\": " + String(dec);
-      else if (i == 6) payload += ", \"V12\": " + String(dec);
-    }
-  }
-  else if (msg.canId == 2281930752) {
-    for (int i = 0; i < msg.len; i += 2) {
-      uint16_t word = (msg.data[i] << 8) | ((i + 1 < msg.len) ? msg.data[i + 1] : 0);
-      float decimalValue = (float)word / 1000.0;
-      char dec[10];
-      sprintf(dec, "%.3f", decimalValue);
-      if (i == 0) payload += "\"V13\": " + String(dec);
-      else if (i == 2) payload += ", \"V14\": " + String(dec);
-      else if (i == 4) payload += ", \"V15\": " + String(dec);
-      else if (i == 6) payload += ", \"V16\": " + String(dec);
-    }
-  }
-  else if (msg.canId == 2214625280) {
-    for (int i = 0; i < msg.len; i += 2) {
-      uint16_t word = (msg.data[i] << 8) | ((i + 1 < msg.len) ? msg.data[i + 1] : 0);
-      float decimalValue;
-      if (i == 0 || i == 4) {
-        decimalValue = (float)word / 10.0;
-      } else {
-        decimalValue = ((float)word - 30000.0) / 10.0;
-      }
-      char dec[10];
-      sprintf(dec, "%.3f", decimalValue);
-      if (i == 0) payload += "\"VT\": " + String(dec);
-      else if (i == 2) payload += ", \"A\": " + String(dec);
-      else if (i == 4) payload += ", \"VO\": " + String(dec);
-      else if (i == 6) payload += ", \"A2\": " + String(dec);
-    }
-  }
-  else if (msg.canId == 2415951872) {
-    for (int i = 0; i < min(4, (int)msg.len); i++) {
-      int decimalValue = msg.data[i] - 40;
-      char dec[10];
-      sprintf(dec, "%d", decimalValue);
-      if (i == 0) payload += "\"T1\": " + String(dec);
-      else if (i == 1) payload += ", \"T2\": " + String(dec);
-      else if (i == 2) payload += ", \"T3\": " + String(dec);
-      else if (i == 3) payload += ", \"T4\": " + String(dec);
-    }
-  }
-  else if (msg.canId == 2214756352) {
-    for (int i = 0; i < msg.len; i++) {
-      float decimalValue;
-      if (i == 5 && i + 1 < msg.len) {
-        uint16_t byte56 = (msg.data[i] << 8) | msg.data[i + 1];
-        decimalValue = (float)byte56 / 160.0;
-        i++;
-      } else {
-        decimalValue = (float)msg.data[i] / 160.0;
-      }
-      char dec[10];
-      sprintf(dec, "%.3f", decimalValue);
-      if (i == 0) payload += "\"S1\": " + String(dec);
-      else if (i == 1) payload += ", \"S2\": " + String(dec);
-      else if (i == 2) payload += ", \"S3\": " + String(dec);
-      else if (i == 3) payload += ", \"S4\": " + String(dec);
-      else if (i == 4) payload += ", \"S5\": " + String(dec);
-      else if (i == 5) payload += ", \"S6\": " + String(dec);
-      else if (i == 6) payload += ", \"S7\": " + String(dec);
-    }
-  }
-  payload += "}";
-
-  if (client.connected()) {
-    payload.toCharArray(mqttPayload, 256);
-    if (client.publish(mqtt_topic, mqttPayload)) {
-      Serial.println("Published CAN ID " + String(msg.canId) + " to MQTT: " + payload);
-    } else {
-      Serial.println("Failed to publish CAN ID " + String(msg.canId) + " to MQTT: " + payload);
-    }
-  } else {
-    Serial.println("MQTT not connected for CAN ID " + String(msg.canId) + ", attempting reconnect...");
-    reconnect();
-    if (client.connected()) {
-      payload.toCharArray(mqttPayload, 256);
-      if (client.publish(mqtt_topic, mqttPayload)) {
-        Serial.println("Published CAN ID " + String(msg.canId) + " to MQTT after reconnect: " + payload);
-      } else {
-        Serial.println("Failed to publish CAN ID " + String(msg.canId) + " even after reconnect");
-      }
-    }
-  }
-}
-
-void publishData() {
-  for (int idx = 0; idx < 7; idx++) {
-    if (dataReceived[idx]) {
-      publishSingleCanData(canData[idx]);
-    }
-  }
-}
-
+// Callback function that executes when data is received
 void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
-  struct_message received;
-  memcpy(&received, incomingData, sizeof(received));
+    memcpy(&canMessage, incomingData, sizeof(canMessage));
+    
+    Serial.print("Received CAN ID: ");
+    Serial.print(canMessage.canId);
+    Serial.print(" | Converted Values: ");
+    
+    String payload = "{";
 
-  // Detailed ESP-NOW reception debug
-  Serial.println("=== ESP-NOW Data Received ===");
-  Serial.print("Sender MAC: ");
-  for (int i = 0; i < 6; i++) {
-    Serial.print(mac[i], HEX);
-    if (i < 5) Serial.print(":");
-  }
-  Serial.println();
-  Serial.print("CAN ID: ");
-  Serial.println(received.canId);
-  Serial.print("Data Length: ");
-  Serial.println(received.len);
-  Serial.print("Raw Data: [");
-  for (int i = 0; i < received.len; i++) {
-    Serial.print(received.data[i], HEX);
-    if (i < received.len - 1) Serial.print(",");
-  }
-  Serial.println("]");
-  Serial.println("=============================");
-
-  // Store the received data
-  bool matched = false;
-  for (int i = 0; i < 7; i++) {
-    if (received.canId == canIds[i]) {
-      memcpy(&canData[i], &received, sizeof(received));
-      dataReceived[i] = true;
-      matched = true;
-      Serial.println("Data stored for CAN ID " + String(canIds[i]) + " at index " + String(i));
-      break;
+    if (canMessage.canId == 2281734144) {
+        for (int i = 0; i < canMessage.len; i += 2) {
+            uint16_t word = (canMessage.data[i] << 8) | ((i + 1 < canMessage.len) ? canMessage.data[i + 1] : 0);
+            float decimalValue = (float)word / 1000.0;
+            char dec[10];
+            sprintf(dec, "%.3f", decimalValue);
+            if (i == 0) payload += "\"V1\": " + String(dec);
+            else if (i == 2) payload += ", \"V2\": " + String(dec);
+            else if (i == 4) payload += ", \"V3\": " + String(dec);
+            else if (i == 6) payload += ", \"V4\": " + String(dec);
+        }
     }
-  }
-  if (!matched) {
-    Serial.println("Received CAN ID not in expected list!");
-  }
-}
-
-// Function to print stored CAN data
-void printStoredData() {
-  Serial.println("=== Stored CAN Data Status ===");
-  for (int i = 0; i < 7; i++) {
-    Serial.print("CAN ID ");
-    Serial.print(canIds[i]);
-    if (dataReceived[i]) {
-      Serial.print(" - Received, Data: [");
-      for (int j = 0; j < canData[i].len; j++) {
-        Serial.print(canData[i].data[j], HEX);
-        if (j < canData[i].len - 1) Serial.print(",");
-      }
-      Serial.println("]");
-    } else {
-      Serial.println(" - No data received yet");
+    else if (canMessage.canId == 2281799680) {
+        for (int i = 0; i < canMessage.len; i += 2) {
+            uint16_t word = (canMessage.data[i] << 8) | ((i + 1 < canMessage.len) ? canMessage.data[i + 1] : 0);
+            float decimalValue = (float)word / 1000.0;
+            char dec[10];
+            sprintf(dec, "%.3f", decimalValue);
+            if (i == 0) payload += "\"V5\": " + String(dec);
+            else if (i == 2) payload += ", \"V6\": " + String(dec);
+            else if (i == 4) payload += ", \"V7\": " + String(dec);
+            else if (i == 6) payload += ", \"V8\": " + String(dec);
+        }
     }
-  }
-  Serial.println("=============================");
+    else if (canMessage.canId == 2281865216) {
+        for (int i = 0; i < canMessage.len; i += 2) {
+            uint16_t word = (canMessage.data[i] << 8) | ((i + 1 < canMessage.len) ? canMessage.data[i + 1] : 0);
+            float decimalValue = (float)word / 1000.0;
+            char dec[10];
+            sprintf(dec, "%.3f", decimalValue);
+            if (i == 0) payload += "\"V9\": " + String(dec);
+            else if (i == 2) payload += ", \"V10\": " + String(dec);
+            else if (i == 4) payload += ", \"V11\": " + String(dec);
+            else if (i == 6) payload += ", \"V12\": " + String(dec);
+        }
+    }
+    else if (canMessage.canId == 2281930752) {
+        for (int i = 0; i < canMessage.len; i += 2) {
+            uint16_t word = (canMessage.data[i] << 8) | ((i + 1 < canMessage.len) ? canMessage.data[i + 1] : 0);
+            float decimalValue = (float)word / 1000.0;
+            char dec[10];
+            sprintf(dec, "%.3f", decimalValue);
+            if (i == 0) payload += "\"V13\": " + String(dec);
+            else if (i == 2) payload += ", \"V14\": " + String(dec);
+            else if (i == 4) payload += ", \"V15\": " + String(dec);
+            else if (i == 6) payload += ", \"V16\": " + String(dec);
+        }
+    }
+    else if (canMessage.canId == 2214625280) {
+        for (int i = 0; i < canMessage.len; i += 2) {
+            uint16_t word = (canMessage.data[i] << 8) | ((i + 1 < canMessage.len) ? canMessage.data[i + 1] : 0);
+            float decimalValue;
+            if (i == 0 || i == 4) {
+                decimalValue = (float)word / 10.0;
+            } else {
+                decimalValue = ((float)word - 30000.0) / 10.0;
+            }
+            char dec[10];
+            sprintf(dec, "%.3f", decimalValue);
+            if (i == 0) payload += "\"VT\": " + String(dec);
+            else if (i == 2) payload += ", \"A\": " + String(dec);
+            else if (i == 4) payload += ", \"VO\": " + String(dec);
+            else if (i == 6) payload += ", \"A2\": " + String(dec);
+        }
+    }
+    else if (canMessage.canId == 2415951872) {
+        for (int i = 0; i < min(4, (int)canMessage.len); i++) {
+            int decimalValue = canMessage.data[i] - 40;
+            char dec[10];
+            sprintf(dec, "%d", decimalValue);
+            if (i == 0) payload += "\"T1\": " + String(dec);
+            else if (i == 1) payload += ", \"T2\": " + String(dec);
+            else if (i == 2) payload += ", \"T3\": " + String(dec);
+            else if (i == 3) payload += ", \"T4\": " + String(dec);
+        }
+    }
+    else if (canMessage.canId == 2214756352) {
+        for (int i = 0; i < canMessage.len; i++) {
+            float decimalValue;
+            if (i == 5 && i + 1 < canMessage.len) {
+                uint16_t byte56 = (canMessage.data[i] << 8) | canMessage.data[i + 1];
+                decimalValue = (float)byte56 / 160.0;
+                i++;
+            } else {
+                decimalValue = (float)canMessage.data[i] / 160.0;
+            }
+            char dec[10];
+            sprintf(dec, "%.3f", decimalValue);
+            if (i == 0) payload += "\"S1\": " + String(dec);
+            else if (i == 1) payload += ", \"S2\": " + String(dec);
+            else if (i == 2) payload += ", \"S3\": " + String(dec);
+            else if (i == 3) payload += ", \"S4\": " + String(dec);
+            else if (i == 4) payload += ", \"S5\": " + String(dec);
+            else if (i == 5) payload += ", \"S6\": " + String(dec);
+            else if (i == 6) payload += ", \"S7\": " + String(dec);
+        }
+    }
+
+    payload += "}";
+    Serial.println(payload);
 }
 
 void setup() {
-  Serial.begin(115200);
-  while (!Serial) { ; }
-  Serial.println("ESP32 ESP-NOW Receiver with MQTT over WiFi");
+    Serial.begin(115200);
+    while (!Serial) {
+        ; // Wait for Serial to initialize
+    }
+    Serial.println("ESP32 ESP-NOW Receiver with Decimal Conversion");
 
-  // Set WiFi mode to Station
-  WiFi.mode(WIFI_STA);
-  Serial.print("MAC Address: ");
-  Serial.println(WiFi.macAddress());
+    WiFi.mode(WIFI_STA);
+    delay(100);
 
-  // Initialize ESP-NOW
-  if (esp_now_init() != ESP_OK) {
-    Serial.println("Error initializing ESP-NOW");
-    ESP.restart();
-  }
-  Serial.println("ESP-NOW Initialized");
-  esp_now_register_recv_cb(OnDataRecv);
-  Serial.println("ESP-NOW Callback Registered");
+    if (esp_now_init() != ESP_OK) {
+        Serial.println("Error initializing ESP-NOW");
+        while (1) delay(100);
+    }
 
-  // Connect to WiFi
-  WiFi.begin(ssid, password);
-  Serial.print("Connecting to WiFi (SSID: ");
-  Serial.print(ssid);
-  Serial.print(")");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println("");
-  Serial.print("WiFi connected, IP address: ");
-  Serial.println(WiFi.localIP());
-  Serial.print("WiFi Channel: ");
-  Serial.println(WiFi.channel());
+    esp_now_register_recv_cb(OnDataRecv);
 
-  // Setup MQTT
-  client.setServer(mqtt_server, mqtt_port);
-  reconnect();
-
-  Serial.println("Receiver Ready");
+    Serial.println("ESP-NOW Receiver Ready...");
+    Serial.print("Receiver MAC Address: ");
+    Serial.println(WiFi.macAddress());
 }
 
 void loop() {
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("WiFi disconnected, attempting to reconnect...");
-    WiFi.reconnect();
-    while (WiFi.status() != WL_CONNECTED) {
-      delay(500);
-      Serial.print(".");
-    }
-    Serial.println("WiFi reconnected");
-  }
-
-  if (!client.connected()) {
-    Serial.println("MQTT connection lost in loop, reconnecting...");
-    reconnect();
-  }
-  client.loop();
-
-  unsigned long currentTime = millis();
-  if (currentTime - lastPublishTime >= publishInterval) {
-    publishData();
-    lastPublishTime = currentTime;
-  }
-
-  // Periodically print stored data for verification
-  if (currentTime - lastStatusTime >= statusInterval) {
-    printStoredData();
-    lastStatusTime = currentTime;
-  }
+    delay(10);
 }
