@@ -107,7 +107,7 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
         }
     }
 
-    // Check if all data is received
+    // Check if all data is received (only set dataComplete when all 7 CAN IDs are received)
     dataComplete = true;
     for(int i = 0; i < 7; i++) {
         if(!storedData.received[i]) {
@@ -207,17 +207,18 @@ void setup() {
 }
 
 void loop() {
-    // 1. Stay in ESP-NOW mode until all data is received or timeout occurs
+    // 1. Stay in ESP-NOW mode until all data is received
     if (!dataComplete) {
         if (millis() - lastDataTime > timeout && lastDataTime != 0) {
-            Serial.println("Timeout waiting for data, proceeding with available data...");
-            dataComplete = true; // Proceed with whatever data was received
+            Serial.println("Timeout waiting for all data, resetting...");
+            delay(500); // Allow Serial output to complete
+            ESP.restart(); // Reset if data collection stalls
         }
         delay(100);
         return;
     }
 
-    // 2. All data received (or timeout), switch to WiFi mode
+    // 2. All data received, switch to WiFi mode
     Serial.println("Switching to WiFi mode...");
     esp_now_deinit();
     WiFi.mode(WIFI_STA);
