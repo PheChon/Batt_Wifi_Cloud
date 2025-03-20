@@ -4,13 +4,13 @@
 #include <PubSubClient.h>
 
 // WiFi and MQTT Configuration
-const char* ssid = "ROYPOW_AP";
-const char* password = "hack123456789";
-const char* mqtt_server = "202.44.12.37";
-const int mqtt_port = 1883;
-const char* mqtt_user = "student";
-const char* mqtt_password = "idealab2024";
-const char* mqtt_topic = "Test2";
+const char* ssid = "";
+const char* password = "";
+const char* mqtt_server = "";
+const int mqtt_port = ;
+const char* mqtt_user = "";
+const char* mqtt_password = "";
+const char* mqtt_topic = "";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
