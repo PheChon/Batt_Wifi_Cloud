@@ -6,11 +6,11 @@
 #include <Preferences.h>
 
 // WiFi and MQTT Configuration (dynamically configurable)
-char mqtt_server[40] = "202.44.12.37";
+char mqtt_server[40] = "";
 int mqtt_port = 1883;
-char mqtt_user[20] = "student";
-char mqtt_password[20] = "idealab2024";
-const char* mqtt_topic = "Test2";
+char mqtt_user[20] = "";
+char mqtt_password[20] = "";
+const char* mqtt_topic = "";
 
 WiFiClient espClient;
 PubSubClient client(espClient);
