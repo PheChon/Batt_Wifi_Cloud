@@ -148,3 +148,78 @@ void setup() {
 void loop() {
     delay(10);
 }
+
+
+if (canMessage.canId == 2281734144) { // V1-V4 (0x880001A0)
+        storedData.received[0] = true;
+        storedData.timestamp[0] = millis();
+        for (int i = 0; i < min(8, (int)canMessage.len); i += 2) {
+            if (i + 1 < canMessage.len) {
+                uint16_t word = (canMessage.data[i] << 8) | canMessage.data[i + 1];
+                storedData.v1_16[i/2] = (float)word / 1000.0;
+            }
+        }
+    }
+    else if (canMessage.canId == 2281799680) { // V5-V8 (0x88000220)
+        storedData.received[1] = true;
+        storedData.timestamp[1] = millis();
+        for (int i = 0; i < min(8, (int)canMessage.len); i += 2) {
+            if (i + 1 < canMessage.len) {
+                uint16_t word = (canMessage.data[i] << 8) | canMessage.data[i + 1];
+                storedData.v1_16[4 + i/2] = (float)word / 1000.0;
+            }
+        }
+    }
+    else if (canMessage.canId == 2281865216) { // V9-V12 (0x880002A0)
+        storedData.received[2] = true;
+        storedData.timestamp[2] = millis();
+        for (int i = 0; i < min(8, (int)canMessage.len); i += 2) {
+            if (i + 1 < canMessage.len) {
+                uint16_t word = (canMessage.data[i] << 8) | canMessage.data[i + 1];
+                storedData.v1_16[8 + i/2] = (float)word / 1000.0;
+            }
+        }
+    }
+    else if (canMessage.canId == 2281930752) { // V13-V16 (0x88000320)
+        storedData.received[3] = true;
+        storedData.timestamp[3] = millis();
+        for (int i = 0; i < min(8, (int)canMessage.len); i += 2) {
+            if (i + 1 < canMessage.len) {
+                uint16_t word = (canMessage.data[i] << 8) | canMessage.data[i + 1];
+                storedData.v1_16[12 + i/2] = (float)word / 1000.0;
+            }
+        }
+    }
+    else if (canMessage.canId == 2214625280) { // VT,A,V0,A2 (0x84000100)
+        storedData.received[4] = true;
+        storedData.timestamp[4] = millis();
+        for (int i = 0; i < min(8, (int)canMessage.len); i += 2) {
+            if (i + 1 < canMessage.len) {
+                uint16_t word = (canMessage.data[i] << 8) | canMessage.data[i + 1];
+                float value = (i == 0 || i == 4) ? (float)word / 10.0 : ((float)word - 30000.0) / 10.0;
+                if (i == 0) storedData.vt = value;
+                else if (i == 2) storedData.a = value;
+                else if (i == 4) storedData.v0 = value;
+                else if (i == 6) storedData.a2 = value;
+            }
+        }
+    }
+    else if (canMessage.canId == 2415951872) { // T1-T4 (0x90000100)
+        storedData.received[5] = true;
+        storedData.timestamp[5] = millis();
+        for (int i = 0; i < min(4, (int)canMessage.len); i++) {
+            storedData.t1_4[i] = (float)(canMessage.data[i] - 40);
+        }
+    }
+    else if (canMessage.canId == 2214756352) { // S1-S7 (0x84000180)
+        storedData.received[6] = true;
+        storedData.timestamp[6] = millis();
+        for (int i = 0; i < min(7, (int)canMessage.len); i++) {
+            if (i == 5 && i + 1 < canMessage.len) {
+                storedData.s1_7[i] = (float)((canMessage.data[i] << 8) | canMessage.data[i + 1]) / 160.0;
+                i++; // Skip next byte as it’s part of S6
+            } else {
+                storedData.s1_7[i] = (float)canMessage.data[i] / 160.0;
+            }
+        }
+    }

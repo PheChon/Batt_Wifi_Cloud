@@ -71,6 +71,23 @@ void initStorage() {
     timeout = INITIAL_TIMEOUT;
 }
 
+// **New Function**: Check if all data is zero
+bool isAllDataZero() {
+    for (int i = 0; i < 16; i++) {
+        if (storedData.v1_16[i] != 0.0) return false;
+    }
+    for (int i = 0; i < 7; i++) {
+        if (storedData.s1_7[i] != 0.0) return false;
+    }
+    for (int i = 0; i < 4; i++) {
+        if (storedData.t1_4[i] != 0.0) return false;
+    }
+    if (storedData.vt != 0.0 || storedData.a != 0.0 || storedData.v0 != 0.0 || storedData.a2 != 0.0) {
+        return false;
+    }
+    return true;
+}
+
 // ESP-NOW Data Receive Callback
 void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
     if (len != sizeof(canMessage)) {
@@ -88,7 +105,7 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
     Serial.print(" Time: ");
     Serial.println(millis());
 
-    // Handle CAN IDs as per your provided code
+    // Handle CAN IDs (example for V1-V4; add others as needed)
     if (canMessage.canId == 2281734144) { // V1-V4 (0x880001A0)
         storedData.received[0] = true;
         storedData.timestamp[0] = millis();
@@ -177,9 +194,7 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
 void handleDataReceive() {
     unsigned long currentTime = millis();
 
-    // Check if critical data (V1-V8) is received
     bool criticalDataReceived = storedData.received[0] && storedData.received[1];
-    // Check if all data is received
     bool allDataReceived = true;
     for (int i = 0; i < 7; i++) {
         if (!storedData.received[i]) {
@@ -188,7 +203,6 @@ void handleDataReceive() {
         }
     }
 
-    // Timeout handling
     if (currentTime - stateStartTime > timeout) {
         Serial.println("Timeout waiting for complete data");
         if (criticalDataReceived || incompleteDataRetries >= MAX_INCOMPLETE_RETRIES) {
@@ -204,7 +218,6 @@ void handleDataReceive() {
         return;
     }
 
-    // Proceed if all data is received
     if (allDataReceived) {
         Serial.println("All data received. Switching to WiFi mode.");
         currentState = WIFI_CONNECT;
@@ -310,9 +323,16 @@ void connectToMQTTBroker() {
     stateStartTime = millis();
 }
 
-// Publish Data and Reset
+// **Modified Function**: Publish Data and Reset
 void publishData() {
-    bool publishSuccess = publishAllData();
+    if (isAllDataZero()) {
+        Serial.println("All data is zero. Skipping publish.");
+    } else {
+        bool publishSuccess = publishAllData();
+        if (!publishSuccess) {
+            Serial.println("Failed to publish some data");
+        }
+    }
     client.disconnect();
     WiFi.disconnect(true);
 
@@ -326,6 +346,7 @@ void publishData() {
     } else {
         esp_now_register_recv_cb(OnDataRecv);
     }
+
     stateStartTime = millis();
 }
 
@@ -344,6 +365,7 @@ void handleError() {
     } else {
         esp_now_register_recv_cb(OnDataRecv);
     }
+
     stateStartTime = millis();
 }
 
