@@ -389,25 +389,11 @@ void setup() {
     // WiFi configuration with WiFiManager
     if (WiFi.SSID() == "") {
         WiFiManager wifiManager;
-        WiFiManagerParameter custom_mqtt_server("server", "MQTT Server", mqtt_server, 40);
-        WiFiManagerParameter custom_mqtt_port("port", "MQTT Port", String(mqtt_port).c_str(), 6);
-        WiFiManagerParameter custom_mqtt_user("user", "MQTT Username", mqtt_user, 20);
-        WiFiManagerParameter custom_mqtt_password("password", "MQTT Password", mqtt_password, 20);
-
-        wifiManager.addParameter(&custom_mqtt_server);
-        wifiManager.addParameter(&custom_mqtt_port);
-        wifiManager.addParameter(&custom_mqtt_user);
-        wifiManager.addParameter(&custom_mqtt_password);
 
         if (!wifiManager.startConfigPortal("ESP_CONFIG", "idealab2024")) {
             Serial.println("Failed to configure WiFi");
             ESP.restart();
         } else {
-            preferences.begin("mqtt-config", false);
-            preferences.putString("server", custom_mqtt_server.getValue());
-            preferences.putInt("port", String(custom_mqtt_port.getValue()).toInt());
-            preferences.putString("user", custom_mqtt_user.getValue());
-            preferences.putString("password", custom_mqtt_password.getValue());
             preferences.end();
         }
     }
